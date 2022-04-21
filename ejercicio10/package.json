@@ -1,0 +1,22 @@
+{
+  "name": "ejercicio10",
+  "version": "1.0.0",
+  "description": "",
+  "main": "ejs/server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon ejs/server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.26.1",
+    "ejs": "^3.1.6",
+    "express": "^4.17.3",
+    "knex": "^1.0.7",
+    "mysql": "^2.18.1",
+    "nodemon": "^2.0.15",
+    "socket.io": "^4.4.1",
+    "sqlite3": "^5.0.2"
+  }
+}

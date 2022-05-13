@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./styles.css">
+    <title>Ejercicio 22</title>
+</head>
+<body>
+    <section>
+        <h2>Productos</h2>
+        <div id="prodTable">
+            <div>
+                <div>
+                    <p >Name</p>
+                    <p >Price</p>
+                    <p >Image</p>
+                </div>
+            </div>
+            <div id="tableBody">
+               
+            </div>
+        </div>
+    </section>
+    <form id= "form" onsubmit=newMessage()>
+        <h2>Centro de mensajes</h2>
+        <label for="user">Ingrese su email</label>
+        <input id="mail" placeholder="email@email.com" type="email" name="user"><br><br>
+        <label for="name">Ingrese su nombre</label>
+        <input id="name" placeholder="Bruno" type="text" name="name"><br><br>
+        <label for="lname">Ingrese su apellido</label>
+        <input id="lname" placeholder="Malagoli" type="text" name="lname"><br><br>
+        <label for="age">Ingrese su edad</label>
+        <input id="age" placeholder="20" type="number" name="age"><br><br>
+        <label for="alias">Ingrese su alias</label>
+        <input id="alias" placeholder="Bru" type="text" name="alias"><br><br>
+        <label for="image">Ingrese su avatar</label>
+        <input id="image" placeholder="https://www.google.com/url?sa=i&url=https%3A%2F%2Fes.wikipedia.org%2Fwiki%2FLionel_Messi&psig=AOvVaw1wECQFLYVtiqdCUnqXm9NT&ust=1652276829190000&source=images&cd=vfe&ved=0CAwQjRxqFwoTCLjl6_2I1fcCFQAAAAAdAAAAABAD" type="url" name="image"><br><br>
+        <label for="msj">Ingrese su mensaje</label>
+        <input id="msj" type="text" name="msj">
+        <button type="submit">Enviar mensaje</button>
+    </form>
+    <hr>
+    <section>
+        <h3>Chat</h3>
+        <div id="chat">
+            <!--Contenido chat-->
+        </div>
+    </section>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="./main.js"></script>
+</body>
+</html>

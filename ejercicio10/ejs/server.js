@@ -7,19 +7,14 @@ const app = express();
 const http = new HttpServer(app);
 const io = new IOServer(http);
 const axios = require("axios");
-const mongoose = require("mongoose");
+const { MongoClient } = require("mongodb");
 const URL = require("../.env/dbOpt");
-const db = require("./MDBSchemas/messSchema");
+const client = new MongoClient(URL);
 const { schema, normalize, denormalize } = require("normalizr");
 const util = require("util");
-mongoose.connect(URL, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 let productos = [];
-let mensajes;
 //Func
 async function getDataProducts() {
   try {
@@ -28,25 +23,6 @@ async function getDataProducts() {
       response = res.data;
     });
     return response;
-  } catch (e) {
-    console.log(e);
-  }
-}
-async function getDataMessages() {
-  try {
-    let response;
-    await axios.get("http://localhost:8080/api/mensaje").then((res) => {
-      response = res.data;
-    });
-    return response;
-  } catch (e) {
-    console.log(e);
-  }
-}
-async function mensajesIniciales() {
-  try {
-    let initialMjs = await getDataMessages();
-    return (mensajes = initialMjs);
   } catch (e) {
     console.log(e);
   }
@@ -69,7 +45,6 @@ app.use(express.static(__dirname + "/views"));
 app.get("/", (req, res) => {
   res.render(__dirname + "/views/index");
 });
-
 app.get("/api/productos-test", async (req, res) => {
   try {
     for (let i = 0; i < 5; i++) {
@@ -86,35 +61,54 @@ app.get("/api/productos-test", async (req, res) => {
   res.send(productos);
   productos = [];
 });
+let lastMessageId;
 app.post("/api/mensaje", async (req, res) => {
-  const mensajes = req.body;
-  const newMensajes = { id: "mensajes", mensajes };
-  const normalizado = normalize(newMensajes, msjSchema);
-  const denormalizado = denormalize(
-    normalizado.result,
-    msjSchema,
-    normalizado.entities
-  );
-  db.Message.create(normalizado);
-  res.send(db.Message.find({}));
-  io.sockets.emit("messageNew", normalizado);
-  print(normalizado);
-  print(denormalizado);
-  console.log(`Normalizado : ${JSON.stringify(normalizado).length}`);
-  console.log(`Desnormalizado : ${JSON.stringify(denormalizado).length}`);
-  console.log(
-    `Porcentaje disminuido: ${compression(
-      JSON.stringify(denormalizado).length,
-      JSON.stringify(normalizado).length
-    )}%`
-  );
-});
-app.get("/api/mensaje", async (req, res) => {
   try {
-    const mensajes = await db.Message.find({});
-    res.send(mensajes);
+    const mensajes = req.body;
+    const newMensajes = { id: "mensajes", mensajes };
+    const normalizado = normalize(newMensajes, msjSchema);
+    await client.connect();
+    const database = client.db("ejercicio22");
+    const coll = database.collection("messages");
+    const messageID = await coll.insertOne(normalizado);
+    lastMessageId = JSON.stringify(messageID.insertedId);
+    io.sockets.emit("messageNew", normalizado);
+    console.log(`Normalizado : ${JSON.stringify(normalizado).length}`);
   } catch (e) {
     console.log(e);
+  } finally {
+    client.close();
+  }
+});
+app.post("/api/mensaje-desnormalizado", async (req, res) => {
+  let mensajeNormalizado = req.body;
+  try {
+    const denormalizado = denormalize(
+      mensajeNormalizado.result,
+      msjSchema,
+      mensajeNormalizado.entities
+    );
+    res.send(denormalizado);
+  } catch (e) {
+    console.log(e);
+  }
+});
+app.get("/api/mensajes-desnormalizados", async (req, res) => {
+  try {
+    await client.connect();
+    const database = client.db("ejercicio22");
+    const coll = database.collection("messages");
+    const normalizado = await coll.find({}, { sort: { _id: -1 } });
+    const denormalizado = denormalize(
+      normalizado.result,
+      msjSchema,
+      normalizado.entities
+    );
+    res.send(denormalizado);
+  } catch (e) {
+    console.log(e);
+  } finally {
+    await client.close();
   }
 });
 //Normalizr Schemas
@@ -126,10 +120,7 @@ const msjSchema = new schema.Entity("msj", {
 io.on("connection", async function (socket) {
   console.log("Usuario conectado");
   io.sockets.emit("initialProducts", await getDataProducts());
-  if (mensajes) {
-    io.sockets.emit("initialMessages", await getDataMessages());
-  }
-  console.log(db);
+  io.sockets.emit("initialMessages");
   socket.on("new-message", (data) => {
     try {
       const { productos } = axios.post(

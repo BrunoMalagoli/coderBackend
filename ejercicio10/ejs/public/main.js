@@ -1,8 +1,33 @@
 const socket = io.connect();
-//const { denormalize } = require("normalizr");
-//const { msjSchema } = require("../server");
 //Products
-
+async function toDenormalize(data) {
+  try {
+    let dataDenormalized = await fetch(
+      "http://localhost:8080/api/mensaje-desnormalizado",
+      {
+        method: "POST",
+        body: data,
+      }
+    );
+    return dataDenormalized;
+  } catch (e) {
+    console.log(e);
+  }
+}
+function getInitialDataDenormalized() {
+  let dataDenormalized = fetch(
+    "http://localhost:8080/api/mensajes-desnormalizados"
+  )
+    .then(async (resp) => {
+      let respuesta = await resp.json();
+      console.log(respuesta);
+      return respuesta;
+    })
+    .catch((e) => {
+      console.log(e);
+    });
+  return dataDenormalized;
+}
 function render(data) {
   let html = data
     .map((producto) => {
@@ -19,16 +44,17 @@ function render(data) {
 socket.on("initialProducts", (data) => {
   render(data);
 });
-socket.on("initialMessages"),
-  (data) => {
-    const denormalizado = denormalize(data.result, msjSchema, data.entities);
-    console.log(denormalizado);
-    renderMessages(denormalizado);
-  };
+socket.on("initialMessages", async () => {
+  let data = await getInitialDataDenormalized();
+  renderMessages(data);
+});
 //Messages
 function renderMessages(data) {
   let timestamp = Date.now();
-  let chat = data
+  console.log(data);
+  let mensajes = data.json();
+  console.log("mensajes" + mensajes);
+  let chat = mensajes
     .map((mensaje) => {
       return `
         <span><b>${mensaje.author.email}</b> (${timestamp}): ${mensaje.text}</span><br>
@@ -37,10 +63,15 @@ function renderMessages(data) {
     .join(" ");
   document.getElementById("chat").innerHTML = chat;
 }
-socket.on("messageNew", (data) => {
-  const denormalizado = denormalize(data.result, msjSchema, data.entities);
-  console.log(denormalizado);
-  renderMessages(denormalizado);
+socket.on("messageNew", async (data) => {
+  console.log(data);
+  try {
+    let dataDenormalizada = await toDenormalize(data);
+    console.log("dataDenormalizada" + JSON.stringify(dataDenormalizada));
+    renderMessages(dataDenormalizada);
+  } catch (e) {
+    console.log(e);
+  }
 });
 
 //Utiles
@@ -67,6 +98,7 @@ async function newMessage() {
     };
     mensajes.push(mensaje);
     socket.emit("new-message", mensajes);
+    mensajes = [];
   } catch (e) {
     console.log(e);
   }

@@ -12,8 +12,25 @@ const URL = require("../.env/dbOpt");
 const client = new MongoClient(URL);
 const { schema, normalize, denormalize } = require("normalizr");
 const util = require("util");
+const cookieParser = require("cookie-parser");
+const session = require("express-session");
+const MongoStore = require("connect-mongo");
+const advancedOptions = { useNewUrlParser: true, useUnifiedTopology: true };
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use(
+  session({
+    store: MongoStore.create({ mongoUrl: URL, mongoOptions: advancedOptions }),
+    secret: "muysecreto",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 60000,
+    },
+  })
+);
+
 let productos = [];
 //Func
 async function getDataProducts() {
@@ -35,8 +52,8 @@ function compression(unnormalized, normalized) {
   let porcentaje = division * 100;
   return porcentaje;
 }
-//HTTP REQUESTS
 
+//Endpoints
 const server = http.listen(PORT, () => {
   console.log(`Servidor levantado en ${PORT}`);
 });
@@ -45,6 +62,7 @@ app.use(express.static(__dirname + "/views"));
 app.get("/", (req, res) => {
   res.render(__dirname + "/views/index");
 });
+//Productos
 app.get("/api/productos-test", async (req, res) => {
   try {
     for (let i = 0; i < 5; i++) {
@@ -61,6 +79,7 @@ app.get("/api/productos-test", async (req, res) => {
   res.send(productos);
   productos = [];
 });
+//Mensajes
 let lastMessageId;
 app.post("/api/mensaje", async (req, res) => {
   try {
@@ -98,7 +117,7 @@ app.get("/api/mensajes-desnormalizados", async (req, res) => {
     await client.connect();
     const database = client.db("ejercicio22");
     const coll = database.collection("messages");
-    const normalizado = await coll.find({}, { sort: { _id: -1 } });
+    const normalizado = coll.find();
     const denormalizado = denormalize(
       normalizado.result,
       msjSchema,
@@ -111,6 +130,38 @@ app.get("/api/mensajes-desnormalizados", async (req, res) => {
     await client.close();
   }
 });
+//Session
+let userLogged;
+app.post("/login", async (req, res) => {
+  console.log(req.body);
+  req.session.user = req.body.name;
+  console.log(req.session);
+  userLogged = req.session.user;
+  io.sockets.emit("loggedIn", userLogged);
+  res.send("Login exitoso");
+});
+app.get("/login", async (req, res) => {
+  try {
+    const user = await req.session.user;
+    userLogged = user;
+    res.send(user);
+  } catch (e) {
+    console.log(e);
+  }
+});
+app.get("/logout", (req, res) => {
+  userLogged = "";
+  req.session.destroy((err) => {
+    if (!err) res.redirect("http://localhost:8080/");
+    else {
+      console.log(err);
+    }
+  });
+});
+app.get("/logged", async (req, res) => {
+  const log = await req.session.user;
+  log ? res.send(log) : res.send(undefined);
+});
 //Normalizr Schemas
 const authorSchema = new schema.Entity("author", {}, { idAttribute: "email" });
 const msjSchema = new schema.Entity("msj", {
@@ -118,9 +169,14 @@ const msjSchema = new schema.Entity("msj", {
 });
 //SOCKETS
 io.on("connection", async function (socket) {
-  console.log("Usuario conectado");
+  userLogged
+    ? console.log("Usuario conectado: " + userLogged)
+    : console.log("Usuario conectado");
   io.sockets.emit("initialProducts", await getDataProducts());
   io.sockets.emit("initialMessages");
+  userLogged
+    ? io.sockets.emit("loggedIn", userLogged)
+    : console.log("No hay sesion");
   socket.on("new-message", (data) => {
     try {
       const { productos } = axios.post(

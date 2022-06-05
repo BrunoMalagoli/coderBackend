@@ -26,7 +26,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      maxAge: 60000,
+      maxAge: 6000,
     },
   })
 );
@@ -80,56 +80,56 @@ app.get("/api/productos-test", async (req, res) => {
   productos = [];
 });
 //Mensajes
-let lastMessageId;
-app.post("/api/mensaje", async (req, res) => {
-  try {
-    const mensajes = req.body;
-    const newMensajes = { id: "mensajes", mensajes };
-    const normalizado = normalize(newMensajes, msjSchema);
-    await client.connect();
-    const database = client.db("ejercicio22");
-    const coll = database.collection("messages");
-    const messageID = await coll.insertOne(normalizado);
-    lastMessageId = JSON.stringify(messageID.insertedId);
-    io.sockets.emit("messageNew", normalizado);
-    console.log(`Normalizado : ${JSON.stringify(normalizado).length}`);
-  } catch (e) {
-    console.log(e);
-  } finally {
-    client.close();
-  }
-});
-app.post("/api/mensaje-desnormalizado", async (req, res) => {
-  let mensajeNormalizado = req.body;
-  try {
-    const denormalizado = denormalize(
-      mensajeNormalizado.result,
-      msjSchema,
-      mensajeNormalizado.entities
-    );
-    res.send(denormalizado);
-  } catch (e) {
-    console.log(e);
-  }
-});
-app.get("/api/mensajes-desnormalizados", async (req, res) => {
-  try {
-    await client.connect();
-    const database = client.db("ejercicio22");
-    const coll = database.collection("messages");
-    const normalizado = coll.find();
-    const denormalizado = denormalize(
-      normalizado.result,
-      msjSchema,
-      normalizado.entities
-    );
-    res.send(denormalizado);
-  } catch (e) {
-    console.log(e);
-  } finally {
-    await client.close();
-  }
-});
+// let lastMessageId;
+// app.post("/api/mensaje", async (req, res) => {
+//   try {
+//     const mensajes = req.body;
+//     const newMensajes = { id: "mensajes", mensajes };
+//     const normalizado = normalize(newMensajes, msjSchema);
+//     await client.connect();
+//     const database = client.db("ejercicio22");
+//     const coll = database.collection("messages");
+//     const messageID = await coll.insertOne(normalizado);
+//     lastMessageId = JSON.stringify(messageID.insertedId);
+//     io.sockets.emit("messageNew", normalizado);
+//     console.log(`Normalizado : ${JSON.stringify(normalizado).length}`);
+//   } catch (e) {
+//     console.log(e);
+//   } finally {
+//     client.close();
+//   }
+// });
+// app.post("/api/mensaje-desnormalizado", async (req, res) => {
+//   let mensajeNormalizado = req.body;
+//   try {
+//     const denormalizado = denormalize(
+//       mensajeNormalizado.result,
+//       msjSchema,
+//       mensajeNormalizado.entities
+//     );
+//     res.send(denormalizado);
+//   } catch (e) {
+//     console.log(e);
+//   }
+// });
+// app.get("/api/mensajes-desnormalizados", async (req, res) => {
+//   try {
+//     await client.connect();
+//     const database = client.db("ejercicio22");
+//     const coll = database.collection("messages");
+//     const normalizado = coll.find();
+//     const denormalizado = denormalize(
+//       normalizado.result,
+//       msjSchema,
+//       normalizado.entities
+//     );
+//     res.send(denormalizado);
+//   } catch (e) {
+//     console.log(e);
+//   } finally {
+//     await client.close();
+//   }
+// });
 //Session
 let userLogged;
 app.post("/login", async (req, res) => {
@@ -158,10 +158,25 @@ app.get("/logout", (req, res) => {
     }
   });
 });
-app.get("/logged", async (req, res) => {
-  const log = await req.session.user;
-  log ? res.send(log) : res.send(undefined);
+app.get("/logged", (req, res) => {
+  const log = req.session.user;
+  if (log !== undefined) {
+    res.send(log);
+  } else {
+    console.log("Session id undefined");
+  }
 });
+//Utils
+async function isLogged() {
+  await axios.get("http://localhost:8080/logged").then((response) => {
+    console.log(response.data);
+    if (response != undefined) {
+      return response.data;
+    } else {
+      return false;
+    }
+  });
+}
 //Normalizr Schemas
 const authorSchema = new schema.Entity("author", {}, { idAttribute: "email" });
 const msjSchema = new schema.Entity("msj", {
@@ -169,24 +184,25 @@ const msjSchema = new schema.Entity("msj", {
 });
 //SOCKETS
 io.on("connection", async function (socket) {
-  userLogged
+  console.log(await isLogged());
+  (await isLogged())
     ? console.log("Usuario conectado: " + userLogged)
     : console.log("Usuario conectado");
   io.sockets.emit("initialProducts", await getDataProducts());
-  io.sockets.emit("initialMessages");
-  userLogged
+  //io.sockets.emit("initialMessages");
+  (await isLogged())
     ? io.sockets.emit("loggedIn", userLogged)
     : console.log("No hay sesion");
-  socket.on("new-message", (data) => {
-    try {
-      const { productos } = axios.post(
-        "http://localhost:8080/api/mensaje",
-        data
-      );
-    } catch (e) {
-      console.log(e);
-    }
-  });
+  // socket.on("new-message", (data) => {
+  //   try {
+  //     const { productos } = axios.post(
+  //       "http://localhost:8080/api/mensaje",
+  //       data
+  //     );
+  //   } catch (e) {
+  //     console.log(e);
+  //   }
+  // });
   //Connection error
   socket.on("connect_error", (err) => {
     console.log(err.message);
